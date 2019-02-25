@@ -1,0 +1,8 @@
+D:\Documents\log\OpenJPASQLs.log.33, line: 72
+D:\Documents\log\OpenJPASQLs.log.37, line: 13438
+D:\Documents\log\OpenJPASQLs.log.70, line: 3892
+D:\Documents\log\OpenJPASQLs.log.89, line: 9044
+D:\Documents\log\OpenJPASQLs.log.33, line: 72
+D:\Documents\log\OpenJPASQLs.log.37, line: 13438
+D:\Documents\log\OpenJPASQLs.log.70, line: 3892
+D:\Documents\log\OpenJPASQLs.log.89, line: 9044
