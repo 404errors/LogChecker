@@ -11,7 +11,10 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 
@@ -20,24 +23,25 @@ public class LogChecker {
 	public static void main(String[] args) {
 		Scanner scanner = new Scanner(System.in);
 		List<Path> logFilesList = LogChecker.getLogFileList(scanner);
-		String pattern = LogChecker.getPattern(scanner);
+		List<String> patternList = LogChecker.getPattern(scanner);
 		scanner.close();
 		String outputFolderString = Paths.get(".").toAbsolutePath().toString();
-		Path outputFile = Paths.get(outputFolderString.substring(0, outputFolderString.length() -1) + "output.txt");
+		String outputFileName = LogChecker.getCurrentDateTimeString() + "-output.txt";
+		Path outputFile = Paths.get(outputFolderString.substring(0, outputFolderString.length() -1) + outputFileName);
 		try {
 			Files.newBufferedWriter(outputFile);
 		} catch (IOException e) {
 			System.out.println("Error on creating output file");
 			e.printStackTrace();
 		}
-		LogChecker.check(logFilesList, outputFile, pattern);
-		System.out.println("Checking done! Open output.txt to view result");
+		LogChecker.check(logFilesList, outputFile, patternList);
+		System.out.println("Checking done! Open " + outputFileName +   " to view result");
 	}
 	
-	private static void check(List<Path> logFilesList, Path outputFile, String pattern) {
+	private static void check(List<Path> logFilesList, Path outputFile, List<String> patternList) {
 		for (Path logFile : logFilesList) {
 			try {
-				LogChecker.checkFile(logFile, pattern, outputFile);
+				LogChecker.checkFile(logFile, patternList, outputFile);
 			} catch (IOException e) {
 				e.printStackTrace();
 				continue;
@@ -48,16 +52,28 @@ public class LogChecker {
 		
 	}
 	
-	private static void checkFile(Path fileToCheck, String pattern, Path outputFile) throws IOException {
+	private static void checkFile(Path fileToCheck, List<String> patternList, Path outputFile) throws IOException {
 		System.out.println("Checking file " + fileToCheck.toString() + System.lineSeparator());
 		// we will be using explicitly charset ISO_8859_1 to avoid java.nio.charset.MalformedInputException 'cause ISO_8859_1 is an all-inclusive charset
 		try(BufferedReader bufferReader = Files.newBufferedReader(fileToCheck, StandardCharsets.ISO_8859_1); BufferedWriter bufferedWriter = Files.newBufferedWriter(outputFile, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 			String line = null;
 			int lineNumber = 0;
+			boolean firstLineInFileFound = true;
 			while ((line = bufferReader.readLine()) != null) {
 				++lineNumber;
-				if (line.toUpperCase().contains(pattern.toUpperCase())) {
-					bufferedWriter.write(fileToCheck.toString() + ", line: " + lineNumber + System.lineSeparator());
+				boolean lineContainsAllPattern = true;
+				for (String pattern : patternList) {
+					if (!line.toUpperCase().contains(pattern.toUpperCase())) {
+						lineContainsAllPattern = false;
+						break;
+					}
+				}
+				if (lineContainsAllPattern) {
+					if (firstLineInFileFound) {
+						firstLineInFileFound = false;
+						bufferedWriter.write(System.lineSeparator() + System.lineSeparator() + fileToCheck.toString());
+					} 
+					bufferedWriter.write(System.lineSeparator() + "line: " + lineNumber + System.lineSeparator() + line);
 				}
 			}
 			
@@ -90,9 +106,14 @@ public class LogChecker {
 		return listOfLogFiles;
 	}
 	
-	private static String getPattern(Scanner scanner) {
-		System.out.println("Enter string to check:");
+	private static List<String> getPattern(Scanner scanner) {
+		System.out.println("Enter string to check (multiple key will be separated by comma):");
 		String pattern = scanner.nextLine();
-		return pattern;
+		return Arrays.asList(pattern.split(","));
+	}
+	
+	private static String getCurrentDateTimeString() {
+		DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM_HH-mm-ss");
+		return dtf.format(LocalDateTime.now());
 	}
 }
