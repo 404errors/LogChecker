@@ -19,49 +19,67 @@ import java.util.List;
 import java.util.Scanner;
 
 public class LogChecker {
-	
+
 	public static void main(String[] args) {
 		Scanner scanner = new Scanner(System.in);
 		List<Path> logFilesList = LogChecker.getLogFileList(scanner);
 		List<String> patternList = LogChecker.getPattern(scanner);
+		List<String> exceptPattern = LogChecker.getExceptPattern(scanner);
 		scanner.close();
 		String outputFolderString = Paths.get(".").toAbsolutePath().toString();
 		String outputFileName = LogChecker.getCurrentDateTimeString() + "-output.txt";
-		Path outputFile = Paths.get(outputFolderString.substring(0, outputFolderString.length() -1) + outputFileName);
+		Path outputFile = Paths.get(outputFolderString.substring(0, outputFolderString.length() - 1) + outputFileName);
 		try {
 			Files.newBufferedWriter(outputFile);
 		} catch (IOException e) {
 			System.out.println("Error on creating output file");
 			e.printStackTrace();
 		}
-		LogChecker.check(logFilesList, outputFile, patternList);
-		System.out.println("Checking done! Open " + outputFileName +   " to view result");
+		LogChecker.check(logFilesList, outputFile, patternList, exceptPattern);
+		System.out.println("Checking done! Open " + outputFileName + " to view result");
 	}
-	
-	private static void check(List<Path> logFilesList, Path outputFile, List<String> patternList) {
+
+	private static void check(List<Path> logFilesList, Path outputFile, List<String> patternList,
+			List<String> exceptPatternList) {
 		for (Path logFile : logFilesList) {
 			try {
-				LogChecker.checkFile(logFile, patternList, outputFile);
+				LogChecker.checkFile(logFile, patternList, exceptPatternList, outputFile);
 			} catch (IOException e) {
 				e.printStackTrace();
 				continue;
 			}
-			
+
 		}
-		
-		
+
 	}
-	
-	private static void checkFile(Path fileToCheck, List<String> patternList, Path outputFile) throws IOException {
+
+	private static void checkFile(Path fileToCheck, List<String> patternList, List<String> exceptPatternList,
+			Path outputFile) throws IOException {
 		System.out.println("Checking file " + fileToCheck.toString() + System.lineSeparator());
-		// we will be using explicitly charset ISO_8859_1 to avoid java.nio.charset.MalformedInputException 'cause ISO_8859_1 is an all-inclusive charset
-		try(BufferedReader bufferReader = Files.newBufferedReader(fileToCheck, StandardCharsets.ISO_8859_1); BufferedWriter bufferedWriter = Files.newBufferedWriter(outputFile, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+		// we will be using explicitly charset ISO_8859_1 to avoid
+		// java.nio.charset.MalformedInputException 'cause ISO_8859_1 is an
+		// all-inclusive charset
+		try (BufferedReader bufferReader = Files.newBufferedReader(fileToCheck, StandardCharsets.ISO_8859_1);
+				BufferedWriter bufferedWriter = Files.newBufferedWriter(outputFile, StandardOpenOption.CREATE,
+						StandardOpenOption.APPEND)) {
 			String line = null;
 			int lineNumber = 0;
 			boolean firstLineInFileFound = true;
 			while ((line = bufferReader.readLine()) != null) {
 				++lineNumber;
 				boolean lineContainsAllPattern = true;
+				if (exceptPatternList != null && !exceptPatternList.isEmpty()) {
+					boolean lineContainsExceptedString = false;
+					for (String exceptPattern : exceptPatternList) {
+						if (line.toUpperCase().contains(exceptPattern.toUpperCase())) {
+							lineContainsExceptedString = true;
+							break;
+						}
+					}
+					if (lineContainsExceptedString) {
+						continue;
+					}
+				}
 				for (String pattern : patternList) {
 					if (!line.toUpperCase().contains(pattern.toUpperCase())) {
 						lineContainsAllPattern = false;
@@ -72,22 +90,23 @@ public class LogChecker {
 					if (firstLineInFileFound) {
 						firstLineInFileFound = false;
 						bufferedWriter.write(System.lineSeparator() + System.lineSeparator() + fileToCheck.toString());
-					} 
-					bufferedWriter.write(System.lineSeparator() + "line: " + lineNumber + System.lineSeparator() + line);
+					}
+					bufferedWriter
+							.write(System.lineSeparator() + "line: " + lineNumber + System.lineSeparator() + line);
 				}
 			}
-			
+
 		}
 	}
-	
-	
+
 	private static List<Path> getLogFileList(Scanner scanner) {
-		System.out.println("Please enter full path to log folder, or just leave it empy to use current folder:" + System.lineSeparator());
+		System.out.println("Please enter full path to log folder, or just leave it empy to use current folder:"
+				+ System.lineSeparator());
 		String userInputLogFolderPath = scanner.nextLine();
 		Path workingDirectory = Paths.get(".").toAbsolutePath();
-		//scanner.close();
+		// scanner.close();
 		if (userInputLogFolderPath != null && !userInputLogFolderPath.trim().isEmpty()) {
-			workingDirectory = Paths.get(userInputLogFolderPath); 
+			workingDirectory = Paths.get(userInputLogFolderPath);
 		}
 		List<Path> listOfLogFiles = new ArrayList<>();
 		try {
@@ -105,15 +124,25 @@ public class LogChecker {
 		}
 		return listOfLogFiles;
 	}
-	
+
 	private static List<String> getPattern(Scanner scanner) {
 		System.out.println("Enter string to check (multiple key will be separated by comma):");
 		String pattern = scanner.nextLine();
-		return Arrays.asList(pattern.split(","));
+		List<String> patternList = new ArrayList<> (Arrays.asList(pattern.split(",")));
+		patternList.removeIf(item -> item.trim().isEmpty());
+		return patternList;
 	}
-	
+
 	private static String getCurrentDateTimeString() {
 		DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM_HH-mm-ss");
 		return dtf.format(LocalDateTime.now());
+	}
+
+	private static List<String> getExceptPattern(Scanner scanner) {
+		System.out.println("Enter exception string to check (multiple key will be separated by comma):");
+		String pattern = scanner.nextLine();
+		List<String> patternList = new ArrayList<> (Arrays.asList(pattern.split(",")));
+		patternList.removeIf(item -> item.trim().isEmpty());
+		return patternList;
 	}
 }
