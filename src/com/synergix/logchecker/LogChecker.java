@@ -66,6 +66,7 @@ public class LogChecker {
 						StandardOpenOption.APPEND)) {
 			String line = null;
 			int lineNumber = 0;
+			boolean fileContainsPattern = false;
 			boolean firstLineInFileFound = true;
 			while ((line = bufferReader.readLine()) != null) {
 				++lineNumber;
@@ -77,14 +78,17 @@ public class LogChecker {
 					}
 				}
 				if (lineContainsAllPattern) {
+					fileContainsPattern = true;
 					if (firstLineInFileFound) {
 						firstLineInFileFound = false;
-						bufferedWriter.write(System.lineSeparator() + System.lineSeparator() + fileToCheck.toString());
+						bufferedWriter.write(fileToCheck.toString());
 					}
 					bufferedWriter.write(formatOutputLine(line, lineNumber));
 				}
 			}
-
+			if (fileContainsPattern) {
+				bufferedWriter.write(System.lineSeparator() + System.lineSeparator());
+			}
 		}
 	}
 
@@ -155,7 +159,7 @@ public class LogChecker {
 			outputLine = outputLine + System.lineSeparator() + queryLog;
 		}
 		int indexOfWhere = outputLine.indexOf("WHERE");
-		outputLine = outputLine.substring(0, indexOfWhere) + System.lineSeparator() + outputLine.substring(indexOfWhere);
+		outputLine = System.lineSeparator() + outputLine.substring(0, indexOfWhere) + System.lineSeparator() + outputLine.substring(indexOfWhere);
 		return outputLine;
 	}
 	
