@@ -151,9 +151,12 @@ public class LogChecker {
 		if (doesLineSeemToBeASQLQuery(queryLog)) {
 			String[] splitedDateTimeAndQuery = splitDatetimeAndQuery(queryLog);
 			outputLine += " " + splitedDateTimeAndQuery[0] + System.lineSeparator() + splitedDateTimeAndQuery[1];
-			return outputLine;
+		} else {
+			outputLine = outputLine + System.lineSeparator() + queryLog;
 		}
-		return outputLine + System.lineSeparator() + queryLog;
+		int indexOfWhere = outputLine.indexOf("WHERE");
+		outputLine = outputLine.substring(0, indexOfWhere) + System.lineSeparator() + outputLine.substring(indexOfWhere);
+		return outputLine;
 	}
 	
 	private static String[] splitDatetimeAndQuery(String queryLog) {
