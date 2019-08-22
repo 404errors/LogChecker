@@ -17,14 +17,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
+import java.util.regex.Pattern;
 
 public class LogChecker {
+	static final List<String> sqlCommonPattern = Arrays.asList("UPDATE", "SELECT", "DELETE FROM");
+	public static final String QUERY_PARAMS_LIST_ANNOTATION = "params";
 
 	public static void main(String[] args) {
+		
 		Scanner scanner = new Scanner(System.in);
 		List<Path> logFilesList = LogChecker.getLogFileList(scanner);
 		List<String> patternList = LogChecker.getPattern(scanner);
-		List<String> exceptPattern = LogChecker.getExceptPattern(scanner);
+		//List<String> exceptPattern = LogChecker.getExceptPattern(scanner);
 		scanner.close();
 		String outputFolderString = Paths.get(".").toAbsolutePath().toString();
 		String outputFileName = LogChecker.getCurrentDateTimeString() + "-output.txt";
@@ -35,15 +39,14 @@ public class LogChecker {
 			System.out.println("Error on creating output file");
 			e.printStackTrace();
 		}
-		LogChecker.check(logFilesList, outputFile, patternList, exceptPattern);
+		LogChecker.check(logFilesList, outputFile, patternList);
 		System.out.println("Checking done! Open " + outputFileName + " to view result");
 	}
 
-	private static void check(List<Path> logFilesList, Path outputFile, List<String> patternList,
-			List<String> exceptPatternList) {
+	private static void check(List<Path> logFilesList, Path outputFile, List<String> patternList) {
 		for (Path logFile : logFilesList) {
 			try {
-				LogChecker.checkFile(logFile, patternList, exceptPatternList, outputFile);
+				LogChecker.checkFile(logFile, patternList, outputFile);
 			} catch (IOException e) {
 				e.printStackTrace();
 				continue;
@@ -53,8 +56,7 @@ public class LogChecker {
 
 	}
 
-	private static void checkFile(Path fileToCheck, List<String> patternList, List<String> exceptPatternList,
-			Path outputFile) throws IOException {
+	private static void checkFile(Path fileToCheck, List<String> patternList, Path outputFile) throws IOException {
 		System.out.println("Checking file " + fileToCheck.toString() + System.lineSeparator());
 		// we will be using explicitly charset ISO_8859_1 to avoid
 		// java.nio.charset.MalformedInputException 'cause ISO_8859_1 is an
@@ -68,18 +70,6 @@ public class LogChecker {
 			while ((line = bufferReader.readLine()) != null) {
 				++lineNumber;
 				boolean lineContainsAllPattern = true;
-				if (exceptPatternList != null && !exceptPatternList.isEmpty()) {
-					boolean lineContainsExceptedString = false;
-					for (String exceptPattern : exceptPatternList) {
-						if (line.toUpperCase().contains(exceptPattern.toUpperCase())) {
-							lineContainsExceptedString = true;
-							break;
-						}
-					}
-					if (lineContainsExceptedString) {
-						continue;
-					}
-				}
 				for (String pattern : patternList) {
 					if (!line.toUpperCase().contains(pattern.toUpperCase())) {
 						lineContainsAllPattern = false;
@@ -91,8 +81,7 @@ public class LogChecker {
 						firstLineInFileFound = false;
 						bufferedWriter.write(System.lineSeparator() + System.lineSeparator() + fileToCheck.toString());
 					}
-					bufferedWriter
-							.write(System.lineSeparator() + "line: " + lineNumber + System.lineSeparator() + line);
+					bufferedWriter.write(formatOutputLine(line, lineNumber));
 				}
 			}
 
@@ -138,11 +127,57 @@ public class LogChecker {
 		return dtf.format(LocalDateTime.now());
 	}
 
+	/*
 	private static List<String> getExceptPattern(Scanner scanner) {
 		System.out.println("Enter exception string to check (multiple key will be separated by comma):");
 		String pattern = scanner.nextLine();
 		List<String> patternList = new ArrayList<> (Arrays.asList(pattern.split(",")));
 		patternList.removeIf(item -> item.trim().isEmpty());
 		return patternList;
+	}
+	*/
+	
+	private static boolean doesLineSeemToBeASQLQuery(String line) {
+		for (String dmlPattern : sqlCommonPattern) {
+			if (line.contains(dmlPattern) && line.contains(QUERY_PARAMS_LIST_ANNOTATION)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	//System.lineSeparator() + "line: "  + System.lineSeparator() + LogChecker.formatSqlLogLine(line)
+	private static String formatOutputLine(String queryLog, int lineNumber) {
+		String outputLine = System.lineSeparator() + "line: " + lineNumber;
+		if (doesLineSeemToBeASQLQuery(queryLog)) {
+			String[] splitedDateTimeAndQuery = splitDatetimeAndQuery(queryLog);
+			outputLine += " " + splitedDateTimeAndQuery[0] + System.lineSeparator() + splitedDateTimeAndQuery[1];
+			return outputLine;
+		}
+		return outputLine + System.lineSeparator() + queryLog;
+	}
+	
+	private static String[] splitDatetimeAndQuery(String queryLog) {
+		String dateTime = null, query = null;
+		for (String sqlKeyWord : sqlCommonPattern) {
+			if (queryLog.contains(sqlKeyWord)) {
+				dateTime = queryLog.substring(0, queryLog.indexOf("]") +1);
+				String rawQuery = queryLog.substring(queryLog.indexOf(sqlKeyWord));
+				query = putParametersInCorrectPosition(rawQuery);
+				break;
+			}
+		}
+		String[] result = {dateTime, query};
+		return result;
+	}
+	
+	private static String putParametersInCorrectPosition(String rawQuery) {
+		String queryPart = rawQuery.substring(0, rawQuery.indexOf("["));
+		String paramsPart = rawQuery.substring(rawQuery.indexOf("params=") + 7, rawQuery.length() -1);
+		String[] paramList = paramsPart.split(", ");
+		// now for each question mark in queryPart, replace with parameter
+		for (int i = 0; i < paramList.length; i++) {
+			queryPart = queryPart.replaceFirst(Pattern.quote("?"), paramList[i]);
+		}
+		return queryPart;
 	}
 }
